@@ -4,7 +4,6 @@ import dataclasses
 import enum
 import json
 import pathlib
-import sys
 import time
 from collections import defaultdict
 from concurrent.futures.thread import ThreadPoolExecutor
@@ -13,7 +12,7 @@ from urllib.parse import urlparse
 
 import requests
 import yaml
-from yaml.parser import ParserError
+from yaml import YAMLError
 
 
 @dataclasses.dataclass
@@ -57,7 +56,7 @@ class ConfigParser:
         """
         path = pathlib.Path(config_file_path)
         if not path.exists():
-            raise InvalidConfigException(f"Error: Config file {config_file_path} does not exist")
+            raise InvalidConfigException(f"Config file '{config_file_path}' does not exist")
 
         extension = path.suffix
 
@@ -81,7 +80,7 @@ class ConfigParser:
             try:
                 endpoints.append(Endpoint(**config_item))
             except TypeError as e:
-                raise InvalidConfigException(f"Error: Invalid endpoint configuration for {config_item}: {e}")
+                raise InvalidConfigException(f"Invalid endpoint configuration for {config_item}: {e}")
 
         return endpoints
 
@@ -90,8 +89,8 @@ class ConfigParser:
         try:
             with open(config_file_path, 'r') as file:
                 return yaml.safe_load(file)
-        except ParserError:
-            InvalidConfigException("Error: Config file is not a valid YAML file")
+        except YAMLError:
+            raise InvalidConfigException("Config file is not a valid YAML file")
 
 
 class Stats:
@@ -122,7 +121,14 @@ class EndpointMonitor:
     def __init__(self):
         self.stats = Stats()
 
-    def check_health(self, endpoint: Endpoint) -> Tuple[str, HealthStatus]:
+    @staticmethod
+    def check_health(endpoint: Endpoint) -> Tuple[str, HealthStatus]:
+        """
+        Check health of endpoint. Healthy if:
+            * response status code is b/w 200 and 299
+            * response time is less than 500ms
+        :returns: (Domain, HealthStatus)
+        """
         domain = endpoint.domain
 
         try:
@@ -134,15 +140,14 @@ class EndpointMonitor:
                 return domain, HealthStatus.UP
             else:
                 return domain, HealthStatus.DOWN
-        except requests.RequestException as e:
+        except requests.RequestException:
             return domain, HealthStatus.DOWN
 
     # Main function to monitor endpoints
     def monitor_endpoints(self, endpoints: List[Endpoint]):
         while True:
             # Check health status for each endpoint with multiple threads
-            # Since this is I/O bound, doing it sequentially is suboptimal.
-            # So we use multi-threading to make it faster (GIL wouldn't be a problem here as this is I/O bound)
+            # Each thread checks a single endpoint
             futures = []
 
             with ThreadPoolExecutor() as executor:
@@ -179,8 +184,7 @@ def set_up_monitoring():
         endpoint_monitor = EndpointMonitor()
         endpoint_monitor.monitor_endpoints(endpoints)
     except InvalidConfigException as exp:
-        print(exp)
-        sys.exit(1)
+        print("Configuration error:", exp)
     except KeyboardInterrupt:
         print("\nMonitoring stopped by user")
     except Exception as e:
