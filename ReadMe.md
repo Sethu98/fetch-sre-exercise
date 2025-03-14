@@ -1,10 +1,40 @@
-### Endpoint Monitoring agent
+# Endpoint Monitoring agent
 
 ## Setting up
 
+### Install python 3.13
+I ran this on my Macbook with python 3.13. Since I'm unsure of version compatibility for the dependencies, please install python 3.13 to run this.
+* For MacOS
+  * download the installer from: https://www.python.org/downloads/release/python-3130/
+* For Ubuntu
+  * follow this guide: https://ubuntushell.com/install-python-beta-on-linux/
+
+### Set up virtual environment
+```bash
+python3 -m venv .venv
+```
+
+### Activate the virtual environment
+```bash
+source .venv/bin/activate
+```
+
+### Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
 ## Running
 
-## Changes
+```bash
+python3 -m endpoint_monitor <Configuration File Path>
+
+# Example
+python3 -m endpoint_monitor test_files/test_config.yaml
+```
+
+## Change List
 ### 1. Use argparse
 While using sys.argv works, adding extra options in the future would be cumbersome. 
 I've built several command line tools with python before so when I saw the usage of sys.argv, I realised that using ArgumentParser would make it easier to read and extend.
