@@ -1,18 +1,19 @@
+import argparse
+import concurrent.futures
 import dataclasses
 import enum
 import json
-import os.path
 import pathlib
 import sys
-from typing import List
-
-import yaml
-import requests
 import time
 from collections import defaultdict
-import argparse
-from yaml.parser import ParserError
+from concurrent.futures.thread import ThreadPoolExecutor
+from typing import List, Tuple
 from urllib.parse import urlparse
+
+import requests
+import yaml
+from yaml.parser import ParserError
 
 
 @dataclasses.dataclass
@@ -117,33 +118,39 @@ class EndpointMonitor:
     """
     Orchestrates endpoint monitoring
     """
+
     def __init__(self):
         self.stats = Stats()
 
-    # Function to perform health checks
-    def check_health(self, endpoint: Endpoint) -> HealthStatus:
+    def check_health(self, endpoint: Endpoint) -> Tuple[str, HealthStatus]:
+        domain = endpoint.domain
+
         try:
             response = requests.request(endpoint.method, endpoint.url, headers=endpoint.headers,
                                         json=endpoint.json_body,
                                         timeout=0.5)
 
-            print(endpoint.url, response)
             if 200 <= response.status_code < 300:
-                return HealthStatus.UP
+                return domain, HealthStatus.UP
             else:
-                return HealthStatus.DOWN
+                return domain, HealthStatus.DOWN
         except requests.RequestException as e:
-            print(endpoint.url, e)
-            return HealthStatus.DOWN
+            return domain, HealthStatus.DOWN
 
     # Main function to monitor endpoints
     def monitor_endpoints(self, endpoints: List[Endpoint]):
         while True:
-            # Check status of all endpoints
-            for endpoint in endpoints:
-                domain = endpoint.domain
-                health_status = self.check_health(endpoint)
-                print(endpoint.url, health_status)
+            # Check health status for each endpoint with multiple threads
+            # Since this is I/O bound, doing it sequentially is suboptimal.
+            # So we use multi-threading to make it faster (GIL wouldn't be a problem here as this is I/O bound)
+            futures = []
+
+            with ThreadPoolExecutor() as executor:
+                for endpoint in endpoints:
+                    futures.append(executor.submit(self.check_health, endpoint))
+
+            for future in concurrent.futures.as_completed(futures):
+                domain, health_status = future.result()
                 self.stats.record_domain_health(domain, health_status)
 
             # Log statistics
