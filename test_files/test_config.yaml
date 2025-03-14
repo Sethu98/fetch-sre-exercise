@@ -14,7 +14,7 @@
   url: https://dev-sre-take-home-exercise-rubric.us-east-1.recruiting-public.fetchrewards.com/body
 - name: sample error down
   url: https://dev-sre-take-home-exercise-rubric.us-east-1.recruiting-public.fetchrewards.com/error
-- name: sample slow response
-  url: https://fakeresponder.com?sleep=600
-- name: sample fast enough response
-  url: https://fakeresponder.com?sleep=350
+#- name: sample slow response
+#  url: https://fakeresponder.com?sleep=600
+#- name: sample fast enough response
+#  url: https://fakeresponder.com?sleep=350

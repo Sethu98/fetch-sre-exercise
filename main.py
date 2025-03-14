@@ -14,6 +14,8 @@ import requests
 import yaml
 from yaml import YAMLError
 
+DEFAULT_TIME_BW_CHECKS_SECS = 15
+
 
 @dataclasses.dataclass
 class Endpoint:
@@ -118,8 +120,9 @@ class EndpointMonitor:
     Orchestrates endpoint monitoring
     """
 
-    def __init__(self):
-        self.stats = Stats()
+    def __init__(self, endpoints: List[Endpoint]):
+        self._stats = Stats()
+        self._endpoints = endpoints
 
     @staticmethod
     def check_health(endpoint: Endpoint) -> Tuple[str, HealthStatus]:
@@ -143,37 +146,48 @@ class EndpointMonitor:
         except requests.RequestException:
             return domain, HealthStatus.DOWN
 
-    # Main function to monitor endpoints
-    def monitor_endpoints(self, endpoints: List[Endpoint]):
+    def check_all_endpoints(self):
+        # Check health status for each endpoint with multiple threads
+        # Each thread checks a single endpoint
+        print(f"Requests started. Checking {len(self._endpoints)} endpoints.")
+        start_time = time.time()
+        futures = []
+
+        with ThreadPoolExecutor() as executor:
+            for endpoint in self._endpoints:
+                futures.append(executor.submit(self.check_health, endpoint))
+
+        for future in concurrent.futures.as_completed(futures):
+            domain, health_status = future.result()
+            self._stats.record_domain_health(domain, health_status)
+
+        end_time = time.time()
+        print(f"Completed processing requests in {round(end_time - start_time, 3)} seconds.\n")
+
+    def start_monitoring(self, time_bw_checks_secs=DEFAULT_TIME_BW_CHECKS_SECS):
+        """
+        Monitor endpoints in a loop. Will not stop until the process is stopped.
+        """
         while True:
-            # Check health status for each endpoint with multiple threads
-            # Each thread checks a single endpoint
-            futures = []
-
-            with ThreadPoolExecutor() as executor:
-                for endpoint in endpoints:
-                    futures.append(executor.submit(self.check_health, endpoint))
-
-            for future in concurrent.futures.as_completed(futures):
-                domain, health_status = future.result()
-                self.stats.record_domain_health(domain, health_status)
+            self.check_all_endpoints()
 
             # Log statistics
-            self.stats.print_stats()
+            self._stats.print_stats()
 
-            print("---")
-            time.sleep(15)
+            print(f"---")
+            time.sleep(time_bw_checks_secs)
 
 
-def parse_args():
+def parse_cli_args():
     parser = argparse.ArgumentParser(prog="endpoints_monitor")
     parser.add_argument("config_file_path")
+    # parser.add_argument("--time_bw_checks", required=False, default=DEFAULT_TIME_BW_CHECKS_SECS)
 
     return parser.parse_args()
 
 
 def set_up_monitoring():
-    cli_args = parse_args()
+    cli_args = parse_cli_args()
     config_file_path = cli_args.config_file_path
 
     try:
@@ -181,8 +195,8 @@ def set_up_monitoring():
         endpoints = ConfigParser.extract_endpoints(config_file_path)
 
         # Start monitoring the endpoints
-        endpoint_monitor = EndpointMonitor()
-        endpoint_monitor.monitor_endpoints(endpoints)
+        endpoint_monitor = EndpointMonitor(endpoints)
+        endpoint_monitor.start_monitoring()
     except InvalidConfigException as exp:
         print("Configuration error:", exp)
     except KeyboardInterrupt:
