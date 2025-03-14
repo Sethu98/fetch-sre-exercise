@@ -1,0 +1,4 @@
+- name: ep1
+  url: https://www.somewebsite.com
+  extra_param: Some value
+--- invalid
