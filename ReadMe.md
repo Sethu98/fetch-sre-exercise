@@ -1,4 +1,4 @@
-# Endpoint Monitoring agent
+# Endpoint Monitor
 
 ## Setting up
 
