@@ -50,23 +50,27 @@ Since we could have multiple endpoints with each request taking upto 500ms (our 
 So I modified the code to use `ThreadPoolExecutor` and send each request in a separate thread. I'm also using `as_completed` to process results as the futures get completed instead of waiting for all of them.
 On measuring the time for 200 endpoints, I observed that sequential execution takes 62 seconds while multithreaded execution takes less than 5 seconds.
 
-###  4. Introduce Endpoint class
+###  4. Introduce `Endpoint` class
 I introduced a dataclass `Endpoint` to store information related to endpoints.
 Now, we do not have to remember what the fields are and the class's constructor would do the key validation for us (meaning absence of required key and presence of an invalid key).
+I also have validation for the data type of each key here so we have a central place that has all keys and validation for endpoints.
 
-###  5. Introduce ConfigParser class
+###  5. Introduce `ConfigParser` class
 I created a new class `ConfigParser` to handle configuration file parsing. This contains validation for file's presence, parsing the YAML file and extracting endpoints. 
 This handles all the parsing and related errors. It also makes it easier to add more file formats if needed and `extract_endpoints` would just give us the endpoints regardless of the file type.
 
-### 6. Introduce EndpointMonitor class
+### 6. Introduce `EndpointMonitor` class
 I moved the endpoint monitoring code to the `EndpointMonitor` class. This class takes a list of endpoints in the constructor. It holds the endpoints and their related statistics together.
 The `start_monitoring` method now does the actual monitoring. The initial code did the parsing and monitoring in the same function. I've separated the concerns here. 
 `ConfigParser` will handle everything related to configuration. `EndpointMonitor` is responsible only for monitoring the given endpoints, and it doesn't care about how we got those endpoints.
 
-### 7. Introduce Stats class
+### 7. Introduce `Stats` class
 This class tracks all statistics. Currently, it's only domain level stats for how many endpoints are up. It'll hold all the stats so it's easy to extend and monitor other kind of statistics when needed.
 For instance, we could monitor the average response time or the different status codes received.
 
+## About error messages
 
+Not all error messages are in layman user terms. For instance, some error messages for validation would include things like `<class 'str'>` and `Endpoint.__init__()`.
+In the interest of time, I've assumed that such monitoring is usually done by developers who will be able to understand the reason for the error despite python specific information in the error messages.
 
 

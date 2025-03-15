@@ -7,7 +7,7 @@ import pathlib
 import time
 from collections import defaultdict
 from concurrent.futures.thread import ThreadPoolExecutor
-from typing import List, Tuple
+from typing import List, Tuple, ClassVar
 from urllib.parse import urlparse
 
 import requests
@@ -24,6 +24,14 @@ class Endpoint:
     method: str = 'GET'
     headers: dict = None
     body: str = None
+
+    data_type_checks: ClassVar[List] = [('name', str), ('url', str), ('method', str), ('headers', dict), ('body', str)]
+
+    def __post_init__(self):
+        for attr_name, expected_type in self.data_type_checks:
+            value = getattr(self, attr_name)
+            if value is not None and not isinstance(value, expected_type):
+                raise TypeError(f"{attr_name} must be of type {expected_type}")
 
     @property
     def domain(self):
